@@ -27,7 +27,7 @@ _ID_RE = r'(?:[0-9a-f]{32,34}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0
 class MediasiteIE(InfoExtractor):
     _VALID_URL = rf'''(?xi)https?://[^/]+/Mediasite/(?:Play
                                                        |Showcase/[^/#?]+/Presentation
-                                                       |Channel/[^/#?]+/watch
+                                                       |Channel/(?P<channel>[^/#?]+)/watch
                                                     )/(?P<id>{_ID_RE})(?P<query>\?[^#]+|)'''
     _EMBED_REGEX = [rf'(?xi)<iframe\b[^>]+\bsrc=(["\'])(?P<url>(?:(?:https?:)?//[^/]+)?/Mediasite/Play/{_ID_RE}(?:\?.*?)?)\1']
     _TESTS = [
@@ -260,6 +260,11 @@ class MediasiteIE(InfoExtractor):
         mobj = self._match_valid_url(url)
         resource_id = mobj.group('id')
         query = mobj.group('query')
+        channel = mobj.group('channel')
+
+        print (query)
+        if query == '':
+            query = '?Collection=' + channel
 
         webpage, urlh = self._download_webpage_handle(url, resource_id)  # XXX: add UrlReferrer?
         redirect_url = urlh.url
