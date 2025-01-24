@@ -5182,6 +5182,7 @@ class _UnsafeExtensionError(Exception):
         'ssa',
         'tt',
         'ttml',
+        'txt',
         'xml',
 
         # others
