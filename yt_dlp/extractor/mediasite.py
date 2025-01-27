@@ -243,10 +243,10 @@ class MediasiteIE(InfoExtractor):
         webpage, urlh = self._download_webpage_handle(url, resource_id)  # XXX: add UrlReferrer?
         redirect_url = urlh.url
 
-        channel = self._html_search_regex(r'"MediasiteChannelId"\:"([^"]+)"', webpage, 'iframe_src', default=None)
+        channel = self._html_search_regex(r'"MediasiteChannelId"\:"([^"]+)"', webpage, 'iframe_src', default='')
 
         # Reconstruct query if it has been left blank. This is required when getting a video from behind a login
-        if query == '':
+        if query == '' and channel != '':
             query = '?Collection=' + channel
 
         # XXX: might have also extracted UrlReferrer and QueryString from the html
