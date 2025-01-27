@@ -271,11 +271,6 @@ class MediasiteIE(InfoExtractor):
 
         presentation = player_options['Presentation']
         if presentation is None:
-            if iframe_src := self._html_search_regex(
-                    r'<iframe src="([^"]+)"', webpage, 'iframe_src', default=None):
-                u = urllib.parse.urlparse(iframe_src)
-                return self.url_result(
-                    u._replace(netloc=u.netloc.replace(str(u.port), '')).geturl())
             raise ExtractorError(
                 'Mediasite says: {}'.format(player_options['PlayerPresentationStatusMessage']),
                 expected=True)
