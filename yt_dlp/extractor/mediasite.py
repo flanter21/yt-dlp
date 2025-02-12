@@ -350,11 +350,11 @@ class MediasiteIE(InfoExtractor):
                     'preference': None if i else -2,
                 })
 
-        transcripts = presentation.get('Transcripts', {})
+        transcripts = presentation.get('Transcripts', [])
         captions, subtitles = {}, {}
         for transcript in transcripts:
             lang_code = traverse_obj(
-                transcript, (('DetailedLanguageCode', 'LanguageCode'), {str}), get_all=False)
+                transcript, (('DetailedLanguageCode', 'LanguageCode'), {str}), get_all=False) or 'und'
             lang_name = transcript.get('Language')
             t = {
                 'url': transcript.get('CaptionsUrl'),
@@ -364,15 +364,19 @@ class MediasiteIE(InfoExtractor):
                 captions.setdefault(lang_code, []).append(t)
             else:
                 subtitles.setdefault(lang_code, []).append(t)
-        if transcript_url := presentation.get('TranscriptUrl'):
-            if determine_ext(transcript_url) != 'txt':
-                if len(transcripts) == 1:
-                    (captions or subtitles).setdefault(lang_code, []).append({
-                        'url': transcript_url,
-                        'name': lang_name,
-                    })
-                else:
-                    subtitles.setdefault('und', []).append({'url': transcript_url})
+        if transcript_url := url_or_none(presentation.get('TranscriptUrl')):
+            if 'playbackTicket=' not in transcript_url:
+                transcript_url = join_nonempty(
+                    transcript_url, traverse_obj(presentation, ('Streams', 0, 'SlidePlaybackTicketId', {str})),
+                    delim='?playbackTicket=')
+            ts = {'url': transcript_url}
+            if len(transcripts) == 1:
+                (captions or subtitles)[lang_code].insert(0, {
+                    'name': lang_name,
+                    **ts,
+                })
+            else:
+                subtitles.setdefault('und', []).insert(0, ts)
 
         return {
             'id': resource_id,
