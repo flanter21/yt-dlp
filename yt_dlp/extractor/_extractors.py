@@ -278,6 +278,8 @@ from .bitchute import (
 from .blackboardcollaborate import (
     BlackboardCollaborateIE,
     BlackboardCollaborateLaunchIE,
+    BlackboardClassCollaborateIE,
+    BlackboardCollaborateUltraSingleCourseIE,
 )
 from .bleacherreport import (
     BleacherReportCMSIE,
