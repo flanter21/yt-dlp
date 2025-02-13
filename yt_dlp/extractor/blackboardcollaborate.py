@@ -1,5 +1,7 @@
 import base64
 import json
+import re
+import urllib.parse
 
 from .common import InfoExtractor
 from ..utils import (
@@ -7,8 +9,11 @@ from ..utils import (
     mimetype2ext,
     parse_iso8601,
     parse_qs,
+    smuggle_url,
     str_or_none,
+    unsmuggle_url,
     url_or_none,
+    urlencode_postdata,
 )
 from ..utils.traversal import traverse_obj
 
@@ -171,3 +176,94 @@ class BlackboardCollaborateLaunchIE(InfoExtractor):
         redirect_url = self._request_webpage(url, video_id=video_id).url
         return self.url_result(redirect_url,
                                ie=BlackboardCollaborateIE.ie_key(), video_id=video_id)
+
+
+class BlackboardClassCollaborateIE(InfoExtractor):
+    _VALID_URL = r'''(?x)
+                        https?://(?P<region>[a-z]+)(?:-lti)?\.bbcollab\.com/
+                        (?:collab/ui/scheduler/)?
+                        lti/?\??(token=(?P<token>[\w%\.\-]+))'''
+
+    def _real_extract(self, url):
+        url, data = unsmuggle_url(url, {})
+        mobj = self._match_valid_url(url)
+        region = mobj['region']
+        token = urllib.parse.unquote(mobj['token'])
+        token_info = json.loads(base64.b64decode(token.split('.')[1] + '==='))
+
+        # Download playlist information
+        endpoint = f'https://{region}.bbcollab.com/collab/api/csa/recordings'
+        headers = {'Authorization': f'Bearer {token}'}
+        playlist_info = self._download_json(endpoint, token_info['context'], 'Downloading playlist information', headers=headers)
+
+        # Write playlist entries and send to BlackboardCollaborateIE
+        entries = []
+        for i in playlist_info['results']:
+            current_url = self._download_json(f'{endpoint}/{i["id"]}/url', i['id'], 'Getting URL for each item', headers=headers)['url']
+
+            # Is it public? Maybe this doesn't work
+            if i['publicLinkAllowed']:
+                availability = 'public'
+            else:
+                availability = 'needs_auth'
+
+            entries.append({
+                'id': i['id'],
+                '_type': 'url',
+                'url': current_url,
+                'view_count': i['playbackCount'],
+                'duration': i['duration'] / 1000,
+                'availability': availability,
+                'ie_key': BlackboardCollaborateLaunchIE.ie_key(),
+            })
+
+        return self.playlist_result(
+            entries,
+            playlist_count=playlist_info['size'],
+            title=data.get('title'),
+            alt_title=data.get('alt_title'),
+            description=data.get('description'),
+            modified_timestamp=data.get('modified_timestamp'),
+            channel_id=data.get('channel_id'))
+
+
+class BlackboardCollaborateUltraSingleCourseIE(InfoExtractor):
+    # Support format of either host/webapps/collab-ultra/tool/collabultra?course_id=course_id or
+    #                          host/webapps/collab-ultra/tool/collabultra/lti/launch?course_id=course_id
+    #                          host/webapps/blackboard/execute/courseMain?course_id=course_id
+    #                          host/ultra/courses/course_id/cl/outline
+    _VALID_URL = r'''(?x)
+                        https://(?P<host>[\w\.]+)/(?:
+                         (?:webapps/
+                                (?:collab-ultra/tool/collabultra(?:/lti/launch)?
+                                |blackboard/execute/courseMain)
+                                    \?[\w\d_=&]*course_id=(?P<course_id>[\d_]+))
+                        |(?:ultra/courses/(?P<course_id2>[\d_]+)/cl/outline))'''
+
+    def _real_extract(self, url):
+        mobj = self._match_valid_url(url)
+        course_id = mobj.group('course_id') or mobj.group('course_id2')
+        host = mobj.group('host')
+
+        course_data = self._download_webpage(
+            f'https://{host}/webapps/collab-ultra/tool/collabultra/lti/launch?course_id={course_id}', course_id, 'Downloading course data')
+
+        # Get attribute values from html. These will later be used as POST data for a request.
+        attrs = dict(re.findall(r'<input[^>]+name="(?P<name>[^"]+)"[^>]+value="(?P<value>[^"]+)"', course_data))
+
+        # Url to retrieve information about playlist from, endpoint
+        endpoint = self._html_search_regex(r'<form[^>]+action="([^"]+)"', course_data, 'form_action')
+
+        # Get authentication token
+        redirect_url = self._request_webpage(endpoint, course_id, 'Getting authentication token', data=urlencode_postdata(attrs)).url
+
+        course_info = self._download_json(
+            f'https://{host}/learn/api/v1/courses/{course_id}', course_id, 'Downloading extra metadata', fatal=False)
+
+        return self.url_result(smuggle_url(redirect_url, {
+            'title': course_info.get('displayName'),
+            'alt_title': course_info.get('displayId'),  # Could also use courseId
+            'description': course_info.get('description'),
+            'modified_timestamp': parse_iso8601(course_info.get('modifiedDate')),
+            'channel_id': course_id}),
+            ie=BlackboardClassCollaborateIE.ie_key(), video_id=None)
