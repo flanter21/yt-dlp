@@ -159,6 +159,24 @@ class BlackboardCollaborateUltraIE(InfoExtractor):
                         ((webapps/collab-ultra/tool/collabultra\?course_id=(?P<course_id>[\d_]+))
                         |(ultra/courses/(?P<course_id2>[\d_]+)/cl/outline))'''
 
+    _TESTS = [ # All Require a login
+        {
+            'url': 'https://umb.umassonline.net/webapps/collab-ultra/tool/collabultra?course_id=_70544_1',
+            'only_matching': True,
+        },
+        {
+            'url': 'https://online.uwl.ac.uk/webapps/collab-ultra/tool/collabultra?course_id=_1445',
+            'only_matching': True,
+        },
+        {
+            'url': 'https://lms.mu.edu.sa/webapps/collab-ultra/tool/collabultra?course_id=_65252_1&mode=cpview',
+            'only_matching': True,
+        },
+        {
+            'url': 'https://nestor.rug.nl/webapps/collab-ultra/tool/collabultra?course_id=_404619_1',
+            'only_matching': True,
+        },
+    ]
     def _real_extract(self, url):
         mobj = self._match_valid_url(url)
         course_id = mobj.group('course_id') or mobj.group('course_id2')
