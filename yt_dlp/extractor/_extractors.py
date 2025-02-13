@@ -275,7 +275,10 @@ from .bitchute import (
     BitChuteChannelIE,
     BitChuteIE,
 )
-from .blackboardcollaborate import BlackboardCollaborateIE
+from .blackboardcollaborate import (
+    BlackboardCollaborateIE,
+    BlackboardCollaborateUltraIE,
+)
 from .bleacherreport import (
     BleacherReportCMSIE,
     BleacherReportIE,
