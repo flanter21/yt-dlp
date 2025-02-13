@@ -1,5 +1,11 @@
 from .common import InfoExtractor
-from ..utils import parse_iso8601
+import re
+import urllib.parse
+from ..utils import (
+    parse_iso8601,
+    urlencode_postdata,
+    mimetype2ext,
+)
 
 
 class BlackboardCollaborateIE(InfoExtractor):
@@ -61,3 +67,49 @@ class BlackboardCollaborateIE(InfoExtractor):
             'timestamp': parse_iso8601(upload_date),
             'title': title,
         }
+
+class BlackboardCollaborateUltraIE(InfoExtractor):
+    # Support format of either host/webapps/collab-ultra/tool/collabultra\?course_id=course_id or
+    #                          host/ultra/courses/course_id/cl/outline
+    _VALID_URL = r'''(?x)
+                        https://(?P<host>[\w\.]+)/
+                        ((webapps/collab-ultra/tool/collabultra\?course_id=(?P<course_id>[\d_]+))
+                        |(ultra/courses/(?P<course_id2>[\d_]+)/cl/outline))'''
+
+    def _real_extract(self, url):
+        mobj = self._match_valid_url(url)
+        course_id = mobj.group('course_id') or mobj.group('course_id2')
+        host = mobj.group('host')
+
+        webpage = self._download_webpage(
+            f'https://{host}/webapps/collab-ultra/tool/collabultra/lti/launch?course_id={course_id}', course_id)
+
+        # Get attribute values from html. These will later be used as POST data for a request.
+        attrs = dict(re.findall(r'<input[^>]+name="(?P<name>[^"]+)"[^>]+value="(?P<value>[^"]+)"', webpage))
+
+        # Url to retrieve information about playlist from
+        region_url = self._html_search_regex(r'<form[^>]+action="([^"]+)"', webpage, 'form_action')
+
+        # Get authentication token
+        webpage = self._request_webpage(region_url, course_id, data=urlencode_postdata(attrs))
+        token = urllib.parse.unquote(webpage.url.split('token=')[1])
+
+        # Download playlist information
+        playlist_host = region_url.replace('/lti', '')
+        playlist_info = self._download_json(f'{playlist_host}/collab/api/csa/recordings', None, headers={'Authorization': f'Bearer {token}'})
+
+        # Write playlist entries and send to BlackboardCollaborateIE
+        entries = []
+        for i in playlist_info['results']:
+            current_url = self.url_result(f'{playlist_host}/collab/ui/session/playback/load/{i["id"]}?authToken={token}', ie=BlackboardCollaborateIE.ie_key(), video_id=i['id'])['url']
+            entries.append({
+                'id': i['id'],
+                '_type': 'url',
+                'url': current_url,
+                'filesize': i['storageSize'],
+                'ie_key': BlackboardCollaborateIE.ie_key(),
+                })
+
+        title = playlist_info.get('name')
+
+        return self.playlist_result(entries, title, playlist_count=playlist_info['size'])
