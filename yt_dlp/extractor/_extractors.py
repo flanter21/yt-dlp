@@ -280,6 +280,7 @@ from .blackboardcollaborate import (
     BlackboardCollaborateLaunchIE,
     BlackboardClassCollaborateIE,
     BlackboardCollaborateUltraSingleCourseIE,
+    BlackboardCollaborateUltraAllCoursesIE,
 )
 from .bleacherreport import (
     BleacherReportCMSIE,
