@@ -22,6 +22,7 @@ from ..utils import (
 from ..utils.traversal import traverse_obj
 
 _ID_RE = r'(?:[0-9a-f]{32,34}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12,14})'
+# API: https://training.mediasite.com/Mediasite/Api/v1/$metadata
 
 
 class MediasiteIE(InfoExtractor):
