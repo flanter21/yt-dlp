@@ -1,6 +1,7 @@
 from .common import InfoExtractor
 import re
 import urllib.parse
+from ..utils.traversal import traverse_obj
 from ..utils import (
     parse_iso8601,
     mimetype2ext,
@@ -158,3 +159,14 @@ class BlackboardCollaborateIE(InfoExtractor):
             'subtitles': subtitles,
             'title': title,
         }
+
+class BlackboardCollaborateLaunchIE(InfoExtractor):
+    _VALID_URL = r'https?://[a-z]+(?:-lti)?\.bbcollab\.com/launch/(?P<token>[\w\.\-]+)'
+
+    def _real_extract(self, url):
+        token = self._match_valid_url(url)['token']
+        video_id = traverse_obj(json.loads(base64.b64decode(token.split('.')[1] + "===")), ('resourceAccessTicket', 'resourceId'))
+
+        redirect_url = self._request_webpage(url, video_id=video_id).url
+        return self.url_result(redirect_url,
+            ie=BlackboardCollaborateIE.ie_key(), video_id=video_id)
