@@ -238,12 +238,12 @@ class MediasiteIE(InfoExtractor):
         mobj = self._match_valid_url(url)
         resource_id = mobj.group('id')
         query = mobj.group('query')
-        #channel = mobj.group('channel')
 
         webpage, urlh = self._download_webpage_handle(url, resource_id)  # XXX: add UrlReferrer?
         redirect_url = urlh.url
 
-        channel = self._html_search_regex(r'"MediasiteChannelId"\:"([^"]+)"', webpage, 'iframe_src', default='')
+        channel = self._html_search_regex(r'"MediasiteChannelId"\:"([^"]+)"', webpage,
+                                          'iframe_src', default='')
 
         # Reconstruct query if it has been left blank. This is required when getting a video from behind a login
         if query == '' and channel != '':
