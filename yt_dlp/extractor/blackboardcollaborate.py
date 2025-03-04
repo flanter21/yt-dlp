@@ -1,6 +1,5 @@
 import base64
 import json
-import re
 import urllib.parse
 
 from .common import InfoExtractor
@@ -279,8 +278,7 @@ class BlackboardCollaborateUltraSingleCourseIE(InfoExtractor):
         course_data = self._download_webpage(
             f'https://{host}/webapps/collab-ultra/tool/collabultra/lti/launch?course_id={course_id}', course_id, 'Downloading course data')
 
-        attrs = dict(re.findall(r'<input[^>]+name="(?P<name>[^"]+)"[^>]+value="(?P<value>[^"]+)"', course_data))
-
+        attrs = self._hidden_inputs(course_data)
         endpoint = self._html_search_regex(r'<form[^>]+action="([^"]+)"', course_data, 'form_action')
 
         redirect_url = self._request_webpage(endpoint, course_id, 'Getting authentication token',
