@@ -196,38 +196,38 @@ class BlackboardClassCollaborateIE(InfoExtractor):
         },
     ]
 
+    def _call_api(self, region, video_id='', api_call='', token=None, note='Downloading JSON metadata', fatal=True):
+        if video_id == '':
+            channel_id = json.loads(base64.b64decode(token.split('.')[1] + '==='))['context']
+
+        return self._download_json(f'https://{region}.bbcollab.com/collab/api/csa/recordings/{video_id + api_call}',
+                                   video_id or channel_id, note=note,
+                                   headers={'Authorization': f'Bearer {token}'} if token else '', fatal=fatal)
+
+    def _parse_availability(self, public_link_allowed):
+        if public_link_allowed:
+            return 'public'
+        else:
+            return 'needs_auth'
+
     def _real_extract(self, url):
         url, data = unsmuggle_url(url, {})
         mobj = self._match_valid_url(url)
         region = mobj['region']
         token = urllib.parse.unquote(mobj['token'])
-        token_info = json.loads(base64.b64decode(token.split('.')[1] + '==='))
 
-        # Download playlist information
-        endpoint = f'https://{region}.bbcollab.com/collab/api/csa/recordings'
-        headers = {'Authorization': f'Bearer {token}'}
-        playlist_info = self._download_json(endpoint, token_info['context'], 'Downloading playlist information', headers=headers)
+        playlist_info = self._call_api(region, token=token, note='Downloading playlist information')
+        entries = traverse_obj(playlist_info, ('results', ..., {
+            'id': ('id', {str_or_none}),
+            'view_count': ('playbackCount', {int_or_none}),
+            'duration': ('duration', {int_or_none(scale=1000)}),
+            'availability': ('publicLinkAllowed', {self._parse_availability}),
+        }))
 
-        # Write playlist entries and send to BlackboardCollaborateIE
-        entries = []
-        for i in playlist_info['results']:
-            current_url = self._download_json(f'{endpoint}/{i["id"]}/url', i['id'], 'Getting URL for each item', headers=headers)['url']
-
-            # Is it public? Maybe this doesn't work
-            if i['publicLinkAllowed']:
-                availability = 'public'
-            else:
-                availability = 'needs_auth'
-
-            entries.append({
-                'id': i['id'],
-                '_type': 'url',
-                'url': current_url,
-                'view_count': i['playbackCount'],
-                'duration': i['duration'] / 1000,
-                'availability': availability,
-                'ie_key': BlackboardCollaborateLaunchIE.ie_key(),
-            })
+        for i in entries:
+            i['_type'] = 'url'
+            i['url'] = self._call_api(region, i['id'], '/url', token)['url']
+            i['ie_key'] = BlackboardCollaborateLaunchIE.ie_key()
 
         return self.playlist_result(
             entries,
