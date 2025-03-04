@@ -279,25 +279,23 @@ class BlackboardCollaborateUltraSingleCourseIE(InfoExtractor):
         course_data = self._download_webpage(
             f'https://{host}/webapps/collab-ultra/tool/collabultra/lti/launch?course_id={course_id}', course_id, 'Downloading course data')
 
-        # Get attribute values from html. These will later be used as POST data for a request.
         attrs = dict(re.findall(r'<input[^>]+name="(?P<name>[^"]+)"[^>]+value="(?P<value>[^"]+)"', course_data))
 
-        # Url to retrieve information about playlist from, endpoint
         endpoint = self._html_search_regex(r'<form[^>]+action="([^"]+)"', course_data, 'form_action')
 
-        # Get authentication token
-        redirect_url = self._request_webpage(endpoint, course_id, 'Getting authentication token', data=urlencode_postdata(attrs)).url
+        redirect_url = self._request_webpage(endpoint, course_id, 'Getting authentication token',
+                                             data=urlencode_postdata(attrs)).url
 
-        course_info = self._download_json(
-            f'https://{host}/learn/api/v1/courses/{course_id}', course_id, 'Downloading extra metadata', fatal=False)
+        course_info = self._download_json(f'https://{host}/learn/api/v1/courses/{course_id}',
+                                          course_id, 'Downloading extra metadata', fatal=False)
 
         return self.url_result(smuggle_url(redirect_url, {
             'title': course_info.get('displayName'),
             'alt_title': course_info.get('displayId'),  # Could also use courseId
             'description': course_info.get('description'),
             'modified_timestamp': parse_iso8601(course_info.get('modifiedDate')),
-            'channel_id': course_id}),
-            ie=BlackboardClassCollaborateIE.ie_key(), video_id=None)
+            'channel_id': course_id,
+        }), ie=BlackboardClassCollaborateIE.ie_key(), video_id=None)
 
 
 class BlackboardCollaborateUltraAllCoursesIE(InfoExtractor):
@@ -329,15 +327,12 @@ class BlackboardCollaborateUltraAllCoursesIE(InfoExtractor):
 
         # Number of results per page seems to depend on the host and while it can be changed by '&limit=', each host seems to have a different upperbound, so a loop might be better
         while number_of_courses > courses_found:
-
-            # Get page containing details about enrolled courses
             current_page = self._download_json(f'{endpoint}&offset={courses_found}', user_id,
                                                'Finding courses')
             number_of_courses = traverse_obj(current_page, ('paging', 'count'))
             user_id = traverse_obj(current_page, ('results', '0', 'userId'))
             courses_found += len(current_page['results'])
 
-            # Process results to send to BlackboardCollaborateUltraSingleCourseIE
             for current_course in traverse_obj(current_page, ('results', ..., 'course')):
                 if current_course['isAvailable']:
                     entries.append({
