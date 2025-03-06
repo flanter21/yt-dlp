@@ -1,9 +1,7 @@
-import base64
-import json
-
 from .common import InfoExtractor
 from ..utils import (
     int_or_none,
+    jwt_decode_hs256,
     mimetype2ext,
     parse_iso8601,
     parse_qs,
@@ -169,7 +167,7 @@ class BlackboardCollaborateLaunchIE(InfoExtractor):
 
     def _real_extract(self, url):
         token = self._match_valid_url(url)['token']
-        video_id = traverse_obj(json.loads(base64.b64decode(token.split('.')[1] + '===')), ('resourceAccessTicket', 'resourceId'))
+        video_id = traverse_obj(jwt_decode_hs256(token), ('resourceAccessTicket', 'resourceId'))
 
         redirect_url = self._request_webpage(url, video_id=video_id).url
         return self.url_result(redirect_url,
@@ -188,7 +186,7 @@ class BlackboardClassCollaborateIE(InfoExtractor):
 
     def _call_api(self, region, video_id='', api_call='', token=None, note='Downloading JSON metadata', fatal=True):
         if video_id == '':
-            channel_id = json.loads(base64.b64decode(token.split('.')[1] + '==='))['context']
+            channel_id = jwt_decode_hs256(token)['context']
 
         return self._download_json(f'https://{region}.bbcollab.com/collab/api/csa/recordings/{video_id + api_call}',
                                    video_id or channel_id, note=note,
